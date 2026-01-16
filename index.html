@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GuruPlan Pro - Edisi Hijau Sekolah</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f0fdf4; overflow-x: hidden; }
+        .loading-overlay { position: fixed; inset: 0; background: white; z-index: 9999; display: flex; items-center: center; justify-content: center; flex-direction: column; transition: opacity 0.5s ease; }
+        .glass { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(12px); }
+        .role-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; }
+        .role-card:hover { transform: translateY(-8px); border-color: #22c55e; }
+        .btn-primary { background-color: #16a34a; transition: all 0.2s; }
+        .btn-primary:hover { background-color: #15803d; transform: scale(1.02); }
+        .hidden-fade { opacity: 0; pointer-events: none; }
+        input[type="range"]::-webkit-slider-runnable-track { background: #dcfce7; border-radius: 10px; height: 8px; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; background: #16a34a; border-radius: 50%; margin-top: -6px; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <!-- Screen Loading -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="w-16 h-16 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+        <p class="mt-6 font-bold text-emerald-700 animate-pulse tracking-widest text-xs uppercase">Sinkronisasi Data Sekolah...</p>
+        <p id="loadingStatus" class="mt-2 text-slate-400 text-[10px]">Menghubungkan ke Server...</p>
+        <button id="retryBtn" onclick="location.reload()" class="hidden mt-6 px-6 py-2 bg-emerald-600 text-white rounded-full text-xs font-bold">Coba Lagi</button>
+    </div>
+
+    <!-- Login Selection -->
+    <div id="roleSelection" class="fixed inset-0 bg-emerald-50 z-50 flex items-center justify-center p-4">
+        <div class="max-w-4xl w-full">
+            <div class="text-center mb-12">
+                <div class="mb-6 flex justify-center">
+                    <img id="mainSchoolLogo" src="https://cdn-icons-png.flaticon.com/512/2854/2854586.png" class="h-24 w-24 object-contain" alt="Logo Sekolah">
+                </div>
+                <h1 id="mainSchoolName" class="text-3xl font-black text-slate-900 tracking-tight mb-2 uppercase">GURUPLAN <span class="text-emerald-600">PRO</span></h1>
+                <p class="text-emerald-700/70 font-medium italic">Sistem Monitoring Capaian Kinerja Terpadu</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div onclick="openAdminPinModal()" class="role-card bg-white p-10 rounded-[2.5rem] shadow-xl border-2 border-transparent group">
+                    <div class="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 text-2xl mb-6 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                        <i class="fas fa-user-tie"></i>
+                    </div>
+                    <h2 class="text-xl font-bold text-slate-900">Kepala Sekolah</h2>
+                    <p class="text-slate-500 text-sm mt-2 leading-relaxed">Kelola data guru, pantau progres real-time, dan atur identitas sekolah.</p>
+                </div>
+
+                <div onclick="setRole('teacher')" class="role-card bg-white p-10 rounded-[2.5rem] shadow-xl border-2 border-transparent group">
+                    <div class="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 text-2xl mb-6 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                        <i class="fas fa-chalkboard-teacher"></i>
+                    </div>
+                    <h2 class="text-xl font-bold text-slate-900">Guru / Staff</h2>
+                    <p class="text-slate-500 text-sm mt-2 leading-relaxed">Update rencana kegiatan dan laporkan bukti capaian harian.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal PIN Admin -->
+    <div id="modalAdminPin" class="fixed inset-0 bg-slate-900/60 hidden z-[60] flex items-center justify-center p-4 backdrop-blur-md">
+        <div class="bg-white rounded-3xl w-full max-w-sm p-8 shadow-2xl text-center">
+            <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i class="fas fa-lock text-xl"></i>
+            </div>
+            <h3 class="font-bold text-xl mb-2">Verifikasi Kepala Sekolah</h3>
+            <input type="password" id="adminPinInput" maxlength="4" placeholder="••••" class="w-full text-center text-3xl tracking-[1em] py-4 border-2 rounded-2xl outline-none focus:border-emerald-600 bg-slate-50 mb-6 font-mono">
+            <div id="pinError" class="hidden text-red-500 text-xs font-bold mb-4">Kode PIN Tidak Sesuai!</div>
+            <div class="flex gap-3">
+                <button onclick="toggleModal('modalAdminPin')" class="flex-1 py-3 font-bold text-slate-400">BATAL</button>
+                <button onclick="validateAdminPin()" class="flex-1 bg-emerald-600 text-white py-3 rounded-2xl font-bold">MASUK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="mainApp" class="hidden min-h-screen">
+        <nav class="sticky top-0 z-40 glass border-b border-emerald-100 px-6 py-4">
+            <div class="max-w-7xl mx-auto flex justify-between items-center">
+                <div class="flex items-center gap-4">
+                    <img id="navSchoolLogo" src="" class="h-10 w-10 object-contain hidden">
+                    <div>
+                        <h1 id="navSchoolName" class="text-sm font-black text-slate-900 uppercase tracking-tighter">GURUPLAN</h1>
+                        <p class="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">MONITORING SYSTEM</p>
+                    </div>
+                </div>
+                <div class="flex bg-emerald-100/50 p-1 rounded-xl gap-1">
+                    <button id="navDashboard" onclick="switchView('leader')" class="hidden px-5 py-2 rounded-lg text-[10px] font-black uppercase transition-all">Dashboard</button>
+                    <button id="navWorkspace" onclick="switchView('teacher')" class="hidden px-5 py-2 rounded-lg text-[10px] font-black uppercase transition-all">Workspace</button>
+                    <button id="navSettings" onclick="openSettingsModal()" class="hidden px-5 py-2 rounded-lg text-[10px] font-black uppercase transition-all">Pengaturan</button>
+                </div>
+                <button onclick="logout()" class="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-red-500 transition-all">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </nav>
+
+        <main class="max-w-7xl mx-auto px-6 py-8">
+            <!-- VIEW: LEADER -->
+            <section id="viewLeader" class="hidden space-y-8">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div class="bg-white p-6 rounded-3xl border-b-4 border-emerald-500 shadow-sm">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Guru</p>
+                        <h3 id="statTotalGuru" class="text-4xl font-black mt-1">0</h3>
+                    </div>
+                    <div class="bg-white p-6 rounded-3xl border-b-4 border-emerald-500 shadow-sm">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Rerata Sekolah</p>
+                        <h3 id="statAvgCapaian" class="text-4xl font-black mt-1 text-emerald-600">0%</h3>
+                    </div>
+                    <div class="bg-emerald-600 p-6 rounded-3xl shadow-xl text-white md:col-span-2 relative overflow-hidden">
+                        <h3 class="text-xl font-black">STATISTIK SEKOLAH</h3>
+                        <p class="text-xs opacity-80 mt-1 uppercase tracking-widest font-bold">Data Real-Time Terhubung</p>
+                        <i class="fas fa-chart-line absolute -right-4 -bottom-4 text-8xl opacity-10"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white border border-emerald-100 rounded-[2.5rem] shadow-sm overflow-hidden">
+                    <div class="p-8 border-b border-emerald-50 flex justify-between items-center">
+                        <h3 class="font-black text-xs uppercase tracking-widest text-emerald-800">Daftar Kinerja Guru</h3>
+                        <button onclick="openAddGuruModal()" class="bg-emerald-600 text-white px-6 py-2.5 rounded-xl text-[10px] font-black hover:bg-emerald-700 transition-all uppercase tracking-widest">
+                            <i class="fas fa-user-plus mr-2"></i> Tambah Guru
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="bg-emerald-50/50 text-[10px] font-bold text-emerald-700 uppercase tracking-widest">
+                                <tr>
+                                    <th class="px-8 py-5 whitespace-nowrap">Guru</th>
+                                    <th class="px-8 py-5 whitespace-nowrap text-center">Progres</th>
+                                    <th class="px-8 py-5 whitespace-nowrap text-right">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leaderGuruTableBody" class="divide-y divide-emerald-50 text-sm"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: TEACHER -->
+            <section id="viewTeacher" class="hidden space-y-8">
+                <div id="recommendationAlert" class="hidden bg-emerald-900 text-white p-6 rounded-3xl shadow-xl flex items-center gap-6 border-l-8 border-emerald-400">
+                    <div class="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0">
+                        <i class="fas fa-lightbulb text-emerald-300"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-black text-[10px] uppercase tracking-widest text-emerald-400 mb-1">Catatan Kepala Sekolah</h4>
+                        <p id="recommendationText" class="text-sm font-medium italic opacity-95"></p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    <div class="lg:col-span-3 space-y-6">
+                        <div class="bg-white border border-emerald-100 rounded-[2.5rem] p-8 text-center shadow-sm relative overflow-hidden">
+                            <div class="absolute top-0 left-0 w-full h-20 bg-emerald-600"></div>
+                            <div class="relative z-10">
+                                <img id="userAvatarImg" src="" class="w-24 h-24 rounded-3xl object-cover border-4 border-white shadow-lg mx-auto mb-4 bg-slate-100">
+                                <h2 id="userNameDisplay" class="font-black text-xl text-slate-900 leading-tight">--</h2>
+                                <p id="userEmailDisplay" class="text-[9px] font-black text-emerald-600 uppercase tracking-widest mt-2 px-3 py-1 bg-emerald-50 rounded-full inline-block">--</p>
+                            </div>
+                        </div>
+                        <button onclick="openAddProgramModal()" class="w-full btn-primary text-white py-4 rounded-2xl font-black text-[10px] tracking-[0.2em] shadow-lg uppercase">
+                            <i class="fas fa-plus mr-2"></i> AGENDA BARU
+                        </button>
+                    </div>
+
+                    <div class="lg:col-span-9 space-y-6">
+                        <div class="bg-white border border-emerald-100 rounded-[2.5rem] shadow-sm overflow-hidden">
+                            <div class="p-6 border-b border-emerald-50 flex justify-between items-center flex-wrap gap-4">
+                                <h3 class="font-black text-xs uppercase tracking-widest text-emerald-800">Data Capaian</h3>
+                                <select id="teacherSelector" onchange="changeActiveTeacher(this.value)" class="text-[10px] font-black bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl border-none outline-none"></select>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left">
+                                    <thead class="bg-emerald-50/30 text-[10px] font-bold text-emerald-700 uppercase tracking-widest">
+                                        <tr>
+                                            <th class="px-8 py-5 whitespace-nowrap">Kegiatan</th>
+                                            <th class="px-8 py-5 whitespace-nowrap text-center">Status</th>
+                                            <th class="px-8 py-5 whitespace-nowrap text-right">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="teacherProgramTableBody" class="divide-y divide-emerald-50 text-sm"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- MODAL SETTINGS -->
+    <div id="modalSettings" class="fixed inset-0 bg-slate-900/60 hidden z-[70] flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-[2rem] w-full max-w-md p-8 shadow-2xl">
+            <h3 class="font-black text-xl mb-6 text-emerald-950 uppercase tracking-widest">Profil Sekolah</h3>
+            <form id="settingsForm" class="space-y-4">
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nama Sekolah</label>
+                    <input type="text" id="setSchoolName" class="w-full px-5 py-3 border-2 border-emerald-50 rounded-xl outline-none focus:border-emerald-600 font-bold">
+                </div>
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">URL Logo</label>
+                    <input type="url" id="setSchoolLogo" class="w-full px-5 py-3 border-2 border-emerald-50 rounded-xl outline-none focus:border-emerald-600 text-xs">
+                </div>
+                <div class="flex gap-4 pt-4">
+                    <button type="button" onclick="toggleModal('modalSettings')" class="flex-1 py-3 font-bold text-slate-300 uppercase text-[10px]">Tutup</button>
+                    <button type="submit" class="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-black uppercase text-[10px]">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL GURU -->
+    <div id="modalGuru" class="fixed inset-0 bg-slate-900/60 hidden z-[70] flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-[2rem] w-full max-w-md p-8 shadow-2xl">
+            <h3 id="modalGuruTitle" class="font-black text-xl mb-6">Profil Guru</h3>
+            <form id="guruForm" class="space-y-4">
+                <input type="hidden" id="editGuruId">
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nama</label>
+                    <input type="text" id="newGuruName" required class="w-full px-5 py-3 border-2 border-emerald-50 rounded-xl outline-none focus:border-emerald-600 font-bold">
+                </div>
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Email/Gelar</label>
+                    <input type="text" id="newGuruEmail" class="w-full px-5 py-3 border-2 border-emerald-50 rounded-xl outline-none focus:border-emerald-600 font-bold">
+                </div>
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Foto URL</label>
+                    <input type="url" id="newGuruPhoto" class="w-full px-5 py-3 border-2 border-emerald-50 rounded-xl outline-none focus:border-emerald-600 text-xs">
+                </div>
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Catatan KS</label>
+                    <textarea id="newGuruRecommend" rows="2" class="w-full px-5 py-3 border-2 border-emerald-50 rounded-xl outline-none focus:border-emerald-600 text-sm italic"></textarea>
+                </div>
+                <div class="flex gap-4 pt-4">
+                    <button type="button" onclick="toggleModal('modalGuru')" class="flex-1 py-3 font-bold text-slate-300 uppercase text-[10px]">Batal</button>
+                    <button type="submit" class="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-black uppercase text-[10px]">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL AGENDA -->
+    <div id="modalProgram" class="fixed inset-0 bg-slate-900/60 hidden z-[70] flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-[2rem] w-full max-w-lg p-8 shadow-2xl">
+            <h3 id="modalProgramTitle" class="font-black text-xl mb-6">Detail Kegiatan</h3>
+            <form id="programForm" class="space-y-4">
+                <input type="hidden" id="editProgIndex" value="-1">
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Rencana</label>
+                    <input type="text" id="inputKegiatan" required class="w-full px-5 py-3 border-2 border-emerald-50 rounded-xl outline-none focus:border-emerald-600 font-black">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Bulan</label>
+                        <select id="inputBulan" class="w-full px-5 py-3 border-2 border-emerald-50 rounded-xl bg-emerald-50/50 font-black text-xs">
+                            <option value="1">Januari</option><option value="2">Februari</option><option value="3">Maret</option>
+                            <option value="4">April</option><option value="5">Mei</option><option value="6">Juni</option>
+                            <option value="7">Juli</option><option value="8">Agustus</option><option value="9">September</option>
+                            <option value="10">Oktober</option><option value="11">November</option><option value="12">Desember</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Progres: <span id="rangeVal" class="text-emerald-700">0%</span></label>
+                        <input type="range" id="inputCapaian" min="0" max="100" class="w-full mt-4 cursor-pointer">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Link Bukti</label>
+                    <input type="url" id="inputDrive" class="w-full px-5 py-3 border-2 border-emerald-50 rounded-xl text-xs">
+                </div>
+                <div class="flex gap-4 pt-4">
+                    <button type="button" onclick="toggleModal('modalProgram')" class="flex-1 py-3 font-bold text-slate-300 uppercase text-[10px]">Batal</button>
+                    <button type="submit" class="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-black uppercase text-[10px]">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // CONFIG & INIT
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'guru-plan-stable-v1';
+        
+        let allGurus = [];
+        let schoolData = { name: 'GURUPLAN PRO', logo: 'https://cdn-icons-png.flaticon.com/512/2854/2854586.png' };
+        let currentTeacherId = '';
+        let currentRole = null; 
+        const MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+
+        // FORCE LOADING TIMEOUT
+        const loadingTimer = setTimeout(() => {
+            const status = document.getElementById('loadingStatus');
+            if (status && !status.classList.contains('hidden')) {
+                status.innerText = "Koneksi lambat, silakan muat ulang halaman.";
+                document.getElementById('retryBtn').classList.remove('hidden');
+            }
+        }, 8000);
+
+        // AUTH PROCESS
+        const initAuth = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (err) {
+                console.error("Auth Error:", err);
+                document.getElementById('loadingStatus').innerText = "Gagal Verifikasi Akun.";
+            }
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                clearTimeout(loadingTimer);
+                startSync();
+            }
+        });
+
+        // SYNC DATA
+        function startSync() {
+            // Listen to School Settings
+            onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'school'), (snap) => {
+                if (snap.exists()) {
+                    schoolData = snap.data();
+                    updateSchoolUI();
+                }
+                // Jika data sekolah masuk, kita anggap koneksi berhasil
+                document.getElementById('loadingOverlay').classList.add('hidden-fade');
+                setTimeout(() => document.getElementById('loadingOverlay').classList.add('hidden'), 500);
+            }, (err) => {
+                console.error("Firestore Error:", err);
+                document.getElementById('loadingStatus').innerText = "Gagal memuat data server.";
+            });
+
+            // Listen to Guru List
+            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'gurus'), (snap) => {
+                allGurus = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                if(!currentTeacherId && allGurus.length > 0) currentTeacherId = allGurus[0].id;
+                renderAll();
+            });
+        }
+
+        // UI UPDATES
+        function updateSchoolUI() {
+            document.getElementById('mainSchoolLogo').src = schoolData.logo;
+            document.getElementById('navSchoolLogo').src = schoolData.logo;
+            document.getElementById('navSchoolLogo').classList.remove('hidden');
+            document.getElementById('mainSchoolName').innerText = schoolData.name;
+            document.getElementById('navSchoolName').innerText = schoolData.name;
+        }
+
+        function renderAll() {
+            if (!currentRole) return;
+            renderAdmin();
+            renderTeacher();
+        }
+
+        function renderAdmin() {
+            const tbody = document.getElementById('leaderGuruTableBody');
+            if(!tbody) return;
+            tbody.innerHTML = '';
+            
+            let totalAvg = 0;
+            allGurus.forEach(g => {
+                const count = (g.programs || []).length;
+                const avg = count ? Math.round(g.programs.reduce((s,p)=>s+p.capaian,0)/count) : 0;
+                totalAvg += avg;
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="px-8 py-5">
+                            <div class="flex items-center gap-3">
+                                <img src="${g.photo || 'https://ui-avatars.com/api/?name='+g.name+'&background=10b981&color=fff'}" class="w-10 h-10 rounded-xl object-cover">
+                                <p class="font-bold text-slate-800">${g.name}</p>
+                            </div>
+                        </td>
+                        <td class="px-8 py-5">
+                            <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                                <div class="h-full bg-emerald-500" style="width:${avg}%"></div>
+                            </div>
+                            <p class="text-center text-[9px] font-black mt-1 text-emerald-700">${avg}% SELESAI</p>
+                        </td>
+                        <td class="px-8 py-5 text-right">
+                            <button onclick="viewDetail('${g.id}')" class="text-emerald-600 font-black text-[10px] uppercase">Detail</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            document.getElementById('statTotalGuru').innerText = allGurus.length;
+            document.getElementById('statAvgCapaian').innerText = (allGurus.length ? Math.round(totalAvg/allGurus.length) : 0) + '%';
+        }
+
+        function renderTeacher() {
+            const g = allGurus.find(x => x.id === currentTeacherId);
+            if(!g) return;
+
+            document.getElementById('userNameDisplay').innerText = g.name;
+            document.getElementById('userEmailDisplay').innerText = g.email || "GURU";
+            document.getElementById('userAvatarImg').src = g.photo || `https://ui-avatars.com/api/?name=${g.name}&background=10b981&color=fff`;
+
+            if(g.recommendation) {
+                document.getElementById('recommendationAlert').classList.remove('hidden');
+                document.getElementById('recommendationText').innerText = g.recommendation;
+            } else {
+                document.getElementById('recommendationAlert').classList.add('hidden');
+            }
+
+            document.getElementById('teacherSelector').innerHTML = allGurus.map(x => `<option value="${x.id}" ${x.id===currentTeacherId?'selected':''}>${x.name}</option>`).join('');
+
+            const tbody = document.getElementById('teacherProgramTableBody');
+            tbody.innerHTML = '';
+            
+            const progs = [...(g.programs || [])].sort((a,b) => a.bulan - b.bulan);
+            progs.forEach((p, i) => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="px-8 py-5">
+                            <p class="font-bold text-slate-800">${p.kegiatan}</p>
+                            <p class="text-[9px] text-slate-400 font-bold uppercase">${MONTHS[p.bulan-1]}</p>
+                        </td>
+                        <td class="px-8 py-5 text-center">
+                            <span class="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black">${p.capaian}%</span>
+                        </td>
+                        <td class="px-8 py-5 text-right">
+                             <button onclick="editProgram(${i})" class="text-slate-400 hover:text-emerald-600 mr-3"><i class="fas fa-edit"></i></button>
+                             <button onclick="deleteProgram(${i})" class="text-slate-300 hover:text-red-500"><i class="fas fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        // GLOBALS FOR UI
+        window.toggleModal = (id) => document.getElementById(id).classList.toggle('hidden');
+        window.switchView = (view) => {
+            document.getElementById('viewLeader').classList.toggle('hidden', view !== 'leader');
+            document.getElementById('viewTeacher').classList.toggle('hidden', view !== 'teacher');
+            document.getElementById('navDashboard').classList.toggle('bg-white', view === 'leader');
+            document.getElementById('navWorkspace').classList.toggle('bg-white', view === 'teacher');
+        };
+
+        window.setRole = (role) => {
+            currentRole = role;
+            document.getElementById('roleSelection').classList.add('hidden');
+            document.getElementById('mainApp').classList.remove('hidden');
+            document.getElementById('navDashboard').classList.toggle('hidden', role !== 'admin');
+            document.getElementById('navSettings').classList.toggle('hidden', role !== 'admin');
+            document.getElementById('navWorkspace').classList.remove('hidden');
+            switchView(role === 'admin' ? 'leader' : 'teacher');
+            renderAll();
+        };
+
+        window.logout = () => {
+            currentRole = null;
+            document.getElementById('roleSelection').classList.remove('hidden');
+            document.getElementById('mainApp').classList.add('hidden');
+        };
+
+        window.validateAdminPin = () => {
+            if (document.getElementById('adminPinInput').value === "1234") {
+                toggleModal('modalAdminPin');
+                setRole('admin');
+            } else {
+                document.getElementById('pinError').classList.remove('hidden');
+            }
+        };
+
+        window.openAdminPinModal = () => {
+            document.getElementById('adminPinInput').value = "";
+            document.getElementById('pinError').classList.add('hidden');
+            toggleModal('modalAdminPin');
+        };
+
+        window.openSettingsModal = () => {
+            document.getElementById('setSchoolName').value = schoolData.name;
+            document.getElementById('setSchoolLogo').value = schoolData.logo;
+            toggleModal('modalSettings');
+        };
+
+        document.getElementById('settingsForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const newData = {
+                name: document.getElementById('setSchoolName').value,
+                logo: document.getElementById('setSchoolLogo').value || 'https://cdn-icons-png.flaticon.com/512/2854/2854586.png'
+            };
+            toggleModal('modalSettings');
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'school'), newData);
+        };
+
+        window.openAddGuruModal = () => {
+            document.getElementById('modalGuruTitle').innerText = "Tambah Guru";
+            document.getElementById('editGuruId').value = "";
+            document.getElementById('guruForm').reset();
+            toggleModal('modalGuru');
+        };
+
+        window.viewDetail = (id) => { currentTeacherId = id; switchView('teacher'); };
+        window.changeActiveTeacher = (id) => { currentTeacherId = id; renderTeacher(); };
+
+        document.getElementById('guruForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('editGuruId').value || `g_${Date.now()}`;
+            const data = {
+                name: document.getElementById('newGuruName').value,
+                email: document.getElementById('newGuruEmail').value,
+                photo: document.getElementById('newGuruPhoto').value,
+                recommendation: document.getElementById('newGuruRecommend').value
+            };
+            toggleModal('modalGuru');
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gurus', id), data, { merge: true });
+        };
+
+        window.openAddProgramModal = () => {
+            document.getElementById('modalProgramTitle').innerText = "Agenda Baru";
+            document.getElementById('editProgIndex').value = "-1";
+            document.getElementById('programForm').reset();
+            document.getElementById('rangeVal').innerText = "0%";
+            toggleModal('modalProgram');
+        };
+
+        window.editProgram = (idx) => {
+            const g = allGurus.find(x => x.id === currentTeacherId);
+            const p = g.programs[idx];
+            document.getElementById('modalProgramTitle').innerText = "Edit Agenda";
+            document.getElementById('editProgIndex').value = idx;
+            document.getElementById('inputKegiatan').value = p.kegiatan;
+            document.getElementById('inputBulan').value = p.bulan;
+            document.getElementById('inputCapaian').value = p.capaian;
+            document.getElementById('rangeVal').innerText = p.capaian + '%';
+            document.getElementById('inputDrive').value = p.drive || "";
+            toggleModal('modalProgram');
+        };
+
+        document.getElementById('programForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const idx = parseInt(document.getElementById('editProgIndex').value);
+            const g = allGurus.find(x => x.id === currentTeacherId);
+            const pData = {
+                kegiatan: document.getElementById('inputKegiatan').value,
+                bulan: parseInt(document.getElementById('inputBulan').value),
+                capaian: parseInt(document.getElementById('inputCapaian').value),
+                drive: document.getElementById('inputDrive').value
+            };
+            let updated = [...(g.programs || [])];
+            if(idx === -1) updated.push(pData);
+            else updated[idx] = pData;
+
+            toggleModal('modalProgram');
+            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gurus', currentTeacherId), { programs: updated });
+        };
+
+        window.deleteProgram = async (idx) => {
+            if(!confirm("Hapus agenda?")) return;
+            const g = allGurus.find(x => x.id === currentTeacherId);
+            let updated = [...g.programs];
+            updated.splice(idx, 1);
+            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gurus', currentTeacherId), { programs: updated });
+        };
+
+        document.getElementById('inputCapaian').oninput = (e) => document.getElementById('rangeVal').innerText = e.target.value + '%';
+
+        initAuth();
+    </script>
+</body>
+</html>
